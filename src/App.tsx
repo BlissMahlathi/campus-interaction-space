@@ -10,6 +10,7 @@ import NotFound from "./pages/NotFound";
 import Marketplace from "./pages/Marketplace";
 import Messages from "./pages/Messages";
 import Profile from "./pages/Profile";
+import Hub from "./pages/Hub";
 
 const queryClient = new QueryClient();
 
@@ -21,7 +22,7 @@ const App = () => (
       <BrowserRouter>
         <Routes>
           <Route path="/" element={<Index />} />
-          <Route path="/hub" element={<MainLayout><div>Information Hub - Coming Soon</div></MainLayout>} />
+          <Route path="/hub" element={<Hub />} />
           <Route path="/marketplace" element={<Marketplace />} />
           <Route path="/messages" element={<Messages />} />
           <Route path="/profile" element={<Profile />} />
