@@ -7,6 +7,7 @@ import { BrowserRouter, Routes, Route } from "react-router-dom";
 import MainLayout from "./components/layout/MainLayout";
 import Index from "./pages/Index";
 import NotFound from "./pages/NotFound";
+import Marketplace from "./pages/Marketplace";
 
 const queryClient = new QueryClient();
 
@@ -19,7 +20,7 @@ const App = () => (
         <Routes>
           <Route path="/" element={<Index />} />
           <Route path="/hub" element={<MainLayout><div>Information Hub - Coming Soon</div></MainLayout>} />
-          <Route path="/marketplace" element={<MainLayout><div>Marketplace - Coming Soon</div></MainLayout>} />
+          <Route path="/marketplace" element={<Marketplace />} />
           <Route path="/messages" element={<MainLayout><div>Messages - Coming Soon</div></MainLayout>} />
           <Route path="/profile" element={<MainLayout><div>Profile - Coming Soon</div></MainLayout>} />
           <Route path="/admin" element={<MainLayout><div>Admin Dashboard - Coming Soon</div></MainLayout>} />
