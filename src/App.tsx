@@ -9,6 +9,7 @@ import Index from "./pages/Index";
 import NotFound from "./pages/NotFound";
 import Marketplace from "./pages/Marketplace";
 import Messages from "./pages/Messages";
+import Profile from "./pages/Profile";
 
 const queryClient = new QueryClient();
 
@@ -23,7 +24,7 @@ const App = () => (
           <Route path="/hub" element={<MainLayout><div>Information Hub - Coming Soon</div></MainLayout>} />
           <Route path="/marketplace" element={<Marketplace />} />
           <Route path="/messages" element={<Messages />} />
-          <Route path="/profile" element={<MainLayout><div>Profile - Coming Soon</div></MainLayout>} />
+          <Route path="/profile" element={<Profile />} />
           <Route path="/admin" element={<MainLayout><div>Admin Dashboard - Coming Soon</div></MainLayout>} />
           <Route path="*" element={<NotFound />} />
         </Routes>
