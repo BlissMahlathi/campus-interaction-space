@@ -8,6 +8,7 @@ import MainLayout from "./components/layout/MainLayout";
 import Index from "./pages/Index";
 import NotFound from "./pages/NotFound";
 import Marketplace from "./pages/Marketplace";
+import Messages from "./pages/Messages";
 
 const queryClient = new QueryClient();
 
@@ -21,7 +22,7 @@ const App = () => (
           <Route path="/" element={<Index />} />
           <Route path="/hub" element={<MainLayout><div>Information Hub - Coming Soon</div></MainLayout>} />
           <Route path="/marketplace" element={<Marketplace />} />
-          <Route path="/messages" element={<MainLayout><div>Messages - Coming Soon</div></MainLayout>} />
+          <Route path="/messages" element={<Messages />} />
           <Route path="/profile" element={<MainLayout><div>Profile - Coming Soon</div></MainLayout>} />
           <Route path="/admin" element={<MainLayout><div>Admin Dashboard - Coming Soon</div></MainLayout>} />
           <Route path="*" element={<NotFound />} />
