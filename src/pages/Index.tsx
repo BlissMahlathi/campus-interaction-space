@@ -1,27 +1,39 @@
 
 import React from 'react';
-import { Link } from 'react-router-dom';
+import { Link, useNavigate } from 'react-router-dom';
 import { Button } from '@/components/ui/button';
 import { ArrowRight, BookOpen, ShoppingBag, MessageCircle } from 'lucide-react';
 
 const Index = () => {
+  const navigate = useNavigate();
+  
   const features = [
     {
       icon: BookOpen,
       title: 'Information Hub',
-      description: 'Share and access academic resources, join study groups, and stay updated.'
+      description: 'Share and access academic resources, join study groups, and stay updated.',
+      path: '/hub'
     },
     {
       icon: ShoppingBag,
       title: 'Marketplace',
-      description: 'Buy and sell academic materials, tech gadgets, and more within your campus.'
+      description: 'Buy and sell academic materials, tech gadgets, and more within your campus.',
+      path: '/marketplace'
     },
     {
       icon: MessageCircle,
       title: 'Messaging',
-      description: 'Connect with fellow students, create study groups, and collaborate seamlessly.'
+      description: 'Connect with fellow students, create study groups, and collaborate seamlessly.',
+      path: '/messages'
     }
   ];
+
+  // Redirect to appropriate page based on authentication status
+  const handleGetStarted = () => {
+    // For now, we'll just redirect to sign in
+    // In a real app, this would check if the user is authenticated
+    navigate('/signin');
+  };
 
   return (
     <div className="min-h-screen flex flex-col items-center justify-center py-12 px-4 sm:px-6 lg:px-8">
@@ -31,13 +43,16 @@ const Index = () => {
             Welcome to CampusSpace
           </h1>
           <p className="text-xl text-gray-500">
-            Your all-in-one platform for campus life
+            Your all-in-one platform for campus life at University of Venda
           </p>
         </div>
 
         <div className="flex flex-wrap justify-center gap-4">
-          <Button asChild size="lg">
-            <Link to="/login">Login</Link>
+          <Button onClick={handleGetStarted} size="lg">
+            Get Started
+          </Button>
+          <Button asChild size="lg" variant="outline">
+            <Link to="/signin">Sign In</Link>
           </Button>
           <Button asChild size="lg" variant="outline">
             <Link to="/signup">Sign Up</Link>
@@ -57,7 +72,7 @@ const Index = () => {
                 <p className="mt-2 text-gray-500">{feature.description}</p>
               </div>
               <div className="mt-4 opacity-0 group-hover:opacity-100 transition-opacity">
-                <Link to={`/${feature.title.toLowerCase().replace(' ', '')}`} className="inline-flex items-center text-primary">
+                <Link to={feature.path} className="inline-flex items-center text-primary">
                   Learn more <ArrowRight className="ml-2 h-4 w-4" />
                 </Link>
               </div>
