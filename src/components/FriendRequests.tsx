@@ -57,7 +57,15 @@ export const useFriendRequests = () => {
           .eq('status', FriendStatus.PENDING);
 
         if (error) throw error;
-        setRequests(data || []);
+        
+        // Transform the data to match our FriendRequest interface
+        const formattedData = data?.map(item => ({
+          ...item,
+          sender: item.sender as unknown as FriendRequest['sender'],
+          receiver: item.receiver as unknown as FriendRequest['receiver']
+        })) || [];
+        
+        setRequests(formattedData);
       } catch (error: any) {
         console.error('Error fetching friend requests:', error);
         toast({

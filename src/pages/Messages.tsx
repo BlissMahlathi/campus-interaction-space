@@ -65,19 +65,22 @@ const Messages = () => {
         
         // Format friends data
         const friendsList = (data || []).map(item => {
+          const senderObj = item.sender as any;
+          const receiverObj = item.receiver as any;
+          
           // If the current user is the sender, return receiver as friend
           if (item.sender_id === user.id) {
             return {
               id: item.receiver_id,
-              name: item.receiver.full_name,
-              avatar_url: item.receiver.avatar_url
+              name: receiverObj.full_name,
+              avatar_url: receiverObj.avatar_url
             };
           }
           // If the current user is the receiver, return sender as friend
           return {
             id: item.sender_id,
-            name: item.sender.full_name,
-            avatar_url: item.sender.avatar_url
+            name: senderObj.full_name,
+            avatar_url: senderObj.avatar_url
           };
         });
         
