@@ -24,22 +24,24 @@ const Marketplace = () => {
                 className="pl-10 w-full"
               />
             </div>
-            <Button className="w-full sm:w-auto">
-              <PlusCircle className="mr-2 h-4 w-4" />
-              List Item
-            </Button>
+            {user && (
+              <Button className="w-full sm:w-auto">
+                <PlusCircle className="mr-2 h-4 w-4" />
+                List Item
+              </Button>
+            )}
           </div>
           
-          <div className="bg-card p-12 rounded-lg border mt-4 text-center">
+          <div className="bg-card p-8 md:p-12 rounded-lg border mt-4 text-center">
             <div className="inline-block p-6 bg-secondary rounded-full mb-4">
-              <ShoppingBag className="h-12 w-12 text-primary" />
+              <ShoppingBag className="h-10 w-10 md:h-12 md:w-12 text-primary" />
             </div>
-            <h2 className="text-2xl font-semibold mb-2">Marketplace Coming Soon</h2>
+            <h2 className="text-xl md:text-2xl font-semibold mb-2">Campus Marketplace</h2>
             <p className="text-muted-foreground max-w-md mx-auto mb-6">
-              Our campus marketplace is under development. Soon you'll be able to buy and sell textbooks, 
-              study materials, and other items directly with other students.
+              Our marketplace will allow you to buy and sell textbooks, study materials, 
+              and other items directly with fellow students.
             </p>
-            <Button variant="outline" disabled>Be notified when it launches</Button>
+            <Button variant="outline">Be notified when it launches</Button>
           </div>
         </div>
       </div>

@@ -115,6 +115,36 @@ export type Database = {
           },
         ]
       }
+      posts: {
+        Row: {
+          author_name: string | null
+          content: string
+          created_at: string | null
+          id: string
+          likes: number | null
+          updated_at: string | null
+          user_id: string
+        }
+        Insert: {
+          author_name?: string | null
+          content: string
+          created_at?: string | null
+          id?: string
+          likes?: number | null
+          updated_at?: string | null
+          user_id: string
+        }
+        Update: {
+          author_name?: string | null
+          content?: string
+          created_at?: string | null
+          id?: string
+          likes?: number | null
+          updated_at?: string | null
+          user_id?: string
+        }
+        Relationships: []
+      }
       profiles: {
         Row: {
           avatar_url: string | null

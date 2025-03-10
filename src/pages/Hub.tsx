@@ -3,13 +3,11 @@ import React, { useState, useEffect } from 'react';
 import { Input } from "@/components/ui/input";
 import { Button } from "@/components/ui/button";
 import { Textarea } from "@/components/ui/textarea";
-import { Search, BookOpen, Users, Bell, ArrowRight, ThumbsUp, MessageCircle, Share2, Trash2, Edit2, Upload } from "lucide-react";
-import {
-  Accordion,
-  AccordionContent,
-  AccordionItem,
-  AccordionTrigger,
-} from "@/components/ui/accordion";
+import { 
+  Search, BookOpen, Users, Bell, ThumbsUp, 
+  MessageCircle, Share2, Trash2, Edit2, Upload, 
+  MoreVertical 
+} from "lucide-react";
 import {
   Dialog,
   DialogContent,
@@ -30,7 +28,8 @@ import { useToast } from "@/hooks/use-toast";
 import { useAuth } from '@/contexts/AuthContext';
 import { supabase } from '@/lib/supabase';
 import { useIsMobile } from '@/hooks/use-mobile';
-import FriendRequests, { useFriendRequests } from '@/components/FriendRequests';
+import FriendRequests from '@/components/FriendRequests';
+import FriendSuggestions from '@/components/FriendSuggestions';
 
 interface Post {
   id: string;
@@ -54,7 +53,6 @@ const Hub = () => {
   const { toast } = useToast();
   const { user } = useAuth();
   const isMobile = useIsMobile();
-  const { checkFriendshipStatus } = useFriendRequests();
   
   const [posts, setPosts] = useState<Post[]>([]);
   const [newPostContent, setNewPostContent] = useState("");
@@ -113,7 +111,6 @@ const Hub = () => {
           user_id: user.id,
           author_name: profile?.full_name || user.email,
           content: newPostContent,
-          created_at: new Date().toISOString(),
           likes: 0
         })
         .select();
@@ -368,20 +365,22 @@ const Hub = () => {
         <div className="grid grid-cols-1 lg:grid-cols-3 gap-8">
           <div className="lg:col-span-2 space-y-6">
             {/* Create Post Section */}
-            <section className="bg-card p-6 rounded-lg border">
-              <h2 className="text-xl font-semibold mb-4">Create a Post</h2>
-              <div className="space-y-4">
-                <Textarea 
-                  placeholder="Share something with your fellow students..." 
-                  value={newPostContent}
-                  onChange={(e) => setNewPostContent(e.target.value)}
-                  className="min-h-[100px]"
-                />
-                <div className="flex justify-end">
-                  <Button onClick={handleCreatePost}>Post</Button>
+            {user && (
+              <section className="bg-card p-6 rounded-lg border">
+                <h2 className="text-xl font-semibold mb-4">Create a Post</h2>
+                <div className="space-y-4">
+                  <Textarea 
+                    placeholder="Share something with your fellow students..." 
+                    value={newPostContent}
+                    onChange={(e) => setNewPostContent(e.target.value)}
+                    className="min-h-[100px]"
+                  />
+                  <div className="flex justify-end">
+                    <Button onClick={handleCreatePost}>Post</Button>
+                  </div>
                 </div>
-              </div>
-            </section>
+              </section>
+            )}
 
             {/* Posts Feed */}
             <section className="space-y-4">
@@ -405,7 +404,9 @@ const Hub = () => {
                         {post.author_id === user?.id && (
                           <DropdownMenu>
                             <DropdownMenuTrigger asChild>
-                              <Button variant="ghost" size="icon">⋮</Button>
+                              <Button variant="ghost" size="icon">
+                                <MoreVertical className="h-4 w-4" />
+                              </Button>
                             </DropdownMenuTrigger>
                             <DropdownMenuContent align="end">
                               <DropdownMenuItem onClick={() => setEditingPost(post)}>
@@ -439,15 +440,16 @@ const Hub = () => {
                           <MessageCircle className="mr-2 h-4 w-4" />
                           {post.comments.length} {post.comments.length === 1 ? "Comment" : "Comments"}
                         </Button>
-                        <Button 
-                          variant="ghost" 
-                          size="sm"
-                          onClick={() => handleSharePost(post.id)}
-                          className="ml-auto"
-                        >
-                          <Share2 className="mr-2 h-4 w-4" />
-                          Share
-                        </Button>
+                        <div className="ml-auto">
+                          <Button 
+                            variant="ghost" 
+                            size="sm"
+                            onClick={() => handleSharePost(post.id)}
+                          >
+                            <Share2 className="mr-2 h-4 w-4" />
+                            {!isMobile && "Share"}
+                          </Button>
+                        </div>
                       </div>
                       
                       {/* Comments section */}
@@ -466,16 +468,18 @@ const Hub = () => {
                       )}
                       
                       {/* Add comment */}
-                      <div className="mt-4 flex gap-2">
-                        <Input 
-                          placeholder="Write a comment..." 
-                          value={commentText[post.id] || ""}
-                          onChange={(e) => setCommentText({...commentText, [post.id]: e.target.value})}
-                        />
-                        <Button size="sm" onClick={() => handleAddComment(post.id)}>
-                          Comment
-                        </Button>
-                      </div>
+                      {user && (
+                        <div className="mt-4 flex gap-2">
+                          <Input 
+                            placeholder="Write a comment..." 
+                            value={commentText[post.id] || ""}
+                            onChange={(e) => setCommentText({...commentText, [post.id]: e.target.value})}
+                          />
+                          <Button size="sm" onClick={() => handleAddComment(post.id)}>
+                            Comment
+                          </Button>
+                        </div>
+                      )}
                     </div>
                   ))}
                 </div>
@@ -485,7 +489,10 @@ const Hub = () => {
 
           <div className="space-y-6">
             {/* Friend Requests Section */}
-            <FriendRequests />
+            {user && <FriendRequests />}
+
+            {/* Friend Suggestions */}
+            {user && <FriendSuggestions />}
 
             {/* Resources Section */}
             <section className="bg-card rounded-lg border p-6">
