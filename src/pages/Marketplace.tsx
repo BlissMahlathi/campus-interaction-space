@@ -4,56 +4,42 @@ import { Input } from "@/components/ui/input";
 import { Card, CardContent, CardFooter, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import MainLayout from '@/components/layout/MainLayout';
-import { Search } from 'lucide-react';
-
-const products = [
-  {
-    id: 1,
-    title: "Calculus Textbook",
-    price: 45,
-    description: "Third Edition, excellent condition",
-    category: "Books"
-  },
-  {
-    id: 2,
-    title: "Scientific Calculator",
-    price: 30,
-    description: "TI-84 Plus, barely used",
-    category: "Tech"
-  },
-  // Add more sample products as needed
-];
+import { Search, ShoppingBag, PlusCircle } from 'lucide-react';
+import { useAuth } from '@/contexts/AuthContext';
 
 const Marketplace = () => {
+  const { user } = useAuth();
+
   return (
     <MainLayout>
-      <div className="space-y-6">
+      <div className="max-w-6xl mx-auto space-y-8 px-4">
         <div className="flex flex-col gap-4">
           <h1 className="text-2xl font-bold">Marketplace</h1>
           
-          <div className="relative">
-            <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 text-gray-500" />
-            <Input 
-              placeholder="Search products..." 
-              className="pl-10"
-            />
+          <div className="flex flex-col sm:flex-row items-center gap-4">
+            <div className="relative flex-1 w-full">
+              <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 text-gray-500" />
+              <Input 
+                placeholder="Search products..." 
+                className="pl-10 w-full"
+              />
+            </div>
+            <Button className="w-full sm:w-auto">
+              <PlusCircle className="mr-2 h-4 w-4" />
+              List Item
+            </Button>
           </div>
           
-          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
-            {products.map((product) => (
-              <Card key={product.id}>
-                <CardHeader>
-                  <CardTitle>{product.title}</CardTitle>
-                </CardHeader>
-                <CardContent>
-                  <p className="text-sm text-gray-600">{product.description}</p>
-                  <p className="text-lg font-bold mt-2">${product.price}</p>
-                </CardContent>
-                <CardFooter>
-                  <Button className="w-full">Buy Now</Button>
-                </CardFooter>
-              </Card>
-            ))}
+          <div className="bg-card p-12 rounded-lg border mt-4 text-center">
+            <div className="inline-block p-6 bg-secondary rounded-full mb-4">
+              <ShoppingBag className="h-12 w-12 text-primary" />
+            </div>
+            <h2 className="text-2xl font-semibold mb-2">Marketplace Coming Soon</h2>
+            <p className="text-muted-foreground max-w-md mx-auto mb-6">
+              Our campus marketplace is under development. Soon you'll be able to buy and sell textbooks, 
+              study materials, and other items directly with other students.
+            </p>
+            <Button variant="outline" disabled>Be notified when it launches</Button>
           </div>
         </div>
       </div>

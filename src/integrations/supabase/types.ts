@@ -119,23 +119,50 @@ export type Database = {
         Row: {
           avatar_url: string | null
           created_at: string
+          field_of_study: string | null
           full_name: string
           id: string
+          study_year: number | null
           updated_at: string
         }
         Insert: {
           avatar_url?: string | null
           created_at?: string
+          field_of_study?: string | null
           full_name: string
           id: string
+          study_year?: number | null
           updated_at?: string
         }
         Update: {
           avatar_url?: string | null
           created_at?: string
+          field_of_study?: string | null
           full_name?: string
           id?: string
+          study_year?: number | null
           updated_at?: string
+        }
+        Relationships: []
+      }
+      user_interests: {
+        Row: {
+          category: Database["public"]["Enums"]["interest_category"]
+          created_at: string | null
+          id: string
+          user_id: string
+        }
+        Insert: {
+          category: Database["public"]["Enums"]["interest_category"]
+          created_at?: string | null
+          id?: string
+          user_id: string
+        }
+        Update: {
+          category?: Database["public"]["Enums"]["interest_category"]
+          created_at?: string | null
+          id?: string
+          user_id?: string
         }
         Relationships: []
       }
@@ -147,7 +174,16 @@ export type Database = {
       [_ in never]: never
     }
     Enums: {
-      [_ in never]: never
+      interest_category:
+        | "hydrology"
+        | "earth_science"
+        | "environmental_science"
+        | "geology"
+        | "water_resources"
+        | "climate_science"
+        | "biology"
+        | "chemistry"
+        | "physics"
     }
     CompositeTypes: {
       [_ in never]: never

@@ -1,5 +1,5 @@
 
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import { Input } from "@/components/ui/input";
 import { Button } from "@/components/ui/button";
 import { Textarea } from "@/components/ui/textarea";
@@ -27,10 +27,15 @@ import {
 } from "@/components/ui/dropdown-menu";
 import MainLayout from '@/components/layout/MainLayout';
 import { useToast } from "@/hooks/use-toast";
+import { useAuth } from '@/contexts/AuthContext';
+import { supabase } from '@/lib/supabase';
+import { useIsMobile } from '@/hooks/use-mobile';
+import FriendRequests, { useFriendRequests } from '@/components/FriendRequests';
 
 interface Post {
   id: string;
   author: string;
+  author_id: string;
   content: string;
   timestamp: string;
   likes: number;
@@ -45,153 +50,166 @@ interface Comment {
   timestamp: string;
 }
 
-interface Resource {
-  id: string;
-  title: string;
-  type: string;
-  department: string;
-  downloads: number;
-  author: string;
-  fileUrl?: string;
-}
-
 const Hub = () => {
   const { toast } = useToast();
-  const [posts, setPosts] = useState<Post[]>([
-    {
-      id: "1",
-      author: "John Doe",
-      content: "Just uploaded new study notes for Computer Science 101. Check them out in the resources section!",
-      timestamp: "2 hours ago",
-      likes: 24,
-      comments: [
-        {
-          id: "c1",
-          author: "Jane Smith",
-          content: "Thanks for sharing! These are really helpful.",
-          timestamp: "1 hour ago"
-        }
-      ],
-      userLiked: false
-    },
-    {
-      id: "2",
-      author: "Alice Johnson",
-      content: "There's a career fair next week at the main hall. Don't miss this opportunity to network with potential employers!",
-      timestamp: "5 hours ago",
-      likes: 42,
-      comments: [],
-      userLiked: true
-    }
-  ]);
+  const { user } = useAuth();
+  const isMobile = useIsMobile();
+  const { checkFriendshipStatus } = useFriendRequests();
   
+  const [posts, setPosts] = useState<Post[]>([]);
   const [newPostContent, setNewPostContent] = useState("");
   const [editingPost, setEditingPost] = useState<Post | null>(null);
   const [commentText, setCommentText] = useState<{[key: string]: string}>({});
   const [searchTerm, setSearchTerm] = useState("");
+  const [loading, setLoading] = useState(true);
 
-  const resources = [
-    {
-      id: "r1",
-      title: "Introduction to Computer Science",
-      type: "Course Notes",
-      department: "Computer Science",
-      downloads: 234,
-      author: "Prof. Smith"
-    },
-    {
-      id: "r2",
-      title: "Calculus II Study Guide",
-      type: "Study Guide",
-      department: "Mathematics",
-      downloads: 189,
-      author: "Jane Doe"
-    },
-    {
-      id: "r3",
-      title: "Physics Lab Manual",
-      type: "Lab Material",
-      department: "Physics",
-      downloads: 156,
-      author: "Dr. Johnson"
-    }
-  ];
+  useEffect(() => {
+    const fetchPosts = async () => {
+      if (!user) return;
+      
+      try {
+        const { data, error } = await supabase
+          .from('posts')
+          .select('*')
+          .order('created_at', { ascending: false });
+        
+        if (error) throw error;
 
-  const studyGroups = [
-    {
-      title: "Advanced Algorithms Study Group",
-      members: 12,
-      nextMeeting: "Tomorrow at 3 PM",
-      location: "Library Room 204"
-    },
-    {
-      title: "Chemistry Lab Prep Group",
-      members: 8,
-      nextMeeting: "Wednesday at 5 PM",
-      location: "Science Building 102"
-    }
-  ];
-
-  const announcements = [
-    {
-      title: "Library Extended Hours",
-      date: "2024-02-15",
-      content: "The library will remain open 24/7 during finals week."
-    },
-    {
-      title: "New Study Resources Available",
-      date: "2024-02-14",
-      content: "Check out our new collection of online study materials."
-    }
-  ];
-
-  const handleCreatePost = () => {
-    if (!newPostContent.trim()) return;
-    
-    const newPost: Post = {
-      id: Date.now().toString(),
-      author: "You", // In a real app, this would be the current user
-      content: newPostContent,
-      timestamp: "Just now",
-      likes: 0,
-      comments: [],
-      userLiked: false
+        const formattedPosts: Post[] = data ? data.map(post => ({
+          id: post.id,
+          author: post.author_name || 'Anonymous',
+          author_id: post.user_id,
+          content: post.content,
+          timestamp: new Date(post.created_at).toLocaleString(),
+          likes: post.likes || 0,
+          comments: [],
+          userLiked: false
+        })) : [];
+        
+        setPosts(formattedPosts);
+      } catch (error) {
+        console.error('Error fetching posts:', error);
+      } finally {
+        setLoading(false);
+      }
     };
+
+    fetchPosts();
+  }, [user]);
+
+  const handleCreatePost = async () => {
+    if (!newPostContent.trim() || !user) return;
     
-    setPosts([newPost, ...posts]);
-    setNewPostContent("");
-    
-    toast({
-      title: "Post created",
-      description: "Your post has been published successfully"
-    });
+    try {
+      const { data: profile } = await supabase
+        .from('profiles')
+        .select('full_name')
+        .eq('id', user.id)
+        .single();
+        
+      const { data, error } = await supabase
+        .from('posts')
+        .insert({
+          user_id: user.id,
+          author_name: profile?.full_name || user.email,
+          content: newPostContent,
+          created_at: new Date().toISOString(),
+          likes: 0
+        })
+        .select();
+      
+      if (error) throw error;
+      
+      const newPost: Post = {
+        id: data[0].id,
+        author: profile?.full_name || user.email || 'Anonymous',
+        author_id: user.id,
+        content: newPostContent,
+        timestamp: 'Just now',
+        likes: 0,
+        comments: [],
+        userLiked: false
+      };
+      
+      setPosts([newPost, ...posts]);
+      setNewPostContent("");
+      
+      toast({
+        title: "Post created",
+        description: "Your post has been published successfully"
+      });
+    } catch (error: any) {
+      console.error('Error creating post:', error);
+      toast({
+        title: "Error",
+        description: "Failed to create post",
+        variant: "destructive"
+      });
+    }
   };
 
-  const handleUpdatePost = () => {
-    if (!editingPost || !editingPost.content.trim()) return;
+  const handleUpdatePost = async () => {
+    if (!editingPost || !editingPost.content.trim() || !user) return;
     
-    setPosts(posts.map(post => 
-      post.id === editingPost.id ? editingPost : post
-    ));
-    
-    setEditingPost(null);
-    
-    toast({
-      title: "Post updated",
-      description: "Your post has been updated successfully"
-    });
+    try {
+      const { error } = await supabase
+        .from('posts')
+        .update({ content: editingPost.content })
+        .eq('id', editingPost.id)
+        .eq('user_id', user.id);
+      
+      if (error) throw error;
+      
+      setPosts(posts.map(post => 
+        post.id === editingPost.id ? editingPost : post
+      ));
+      
+      setEditingPost(null);
+      
+      toast({
+        title: "Post updated",
+        description: "Your post has been updated successfully"
+      });
+    } catch (error: any) {
+      console.error('Error updating post:', error);
+      toast({
+        title: "Error",
+        description: "Failed to update post",
+        variant: "destructive" 
+      });
+    }
   };
 
-  const handleDeletePost = (id: string) => {
-    setPosts(posts.filter(post => post.id !== id));
+  const handleDeletePost = async (id: string) => {
+    if (!user) return;
     
-    toast({
-      title: "Post deleted",
-      description: "Your post has been deleted"
-    });
+    try {
+      const { error } = await supabase
+        .from('posts')
+        .delete()
+        .eq('id', id)
+        .eq('user_id', user.id);
+      
+      if (error) throw error;
+      
+      setPosts(posts.filter(post => post.id !== id));
+      
+      toast({
+        title: "Post deleted",
+        description: "Your post has been deleted"
+      });
+    } catch (error: any) {
+      console.error('Error deleting post:', error);
+      toast({
+        title: "Error",
+        description: "Failed to delete post",
+        variant: "destructive"
+      });
+    }
   };
 
   const handleLikePost = (id: string) => {
+    // For a future implementation with database
     setPosts(posts.map(post => {
       if (post.id === id) {
         return {
@@ -228,15 +246,48 @@ const Hub = () => {
   };
 
   const handleSharePost = (id: string) => {
-    // In a real app, this would open a sharing dialog
-    toast({
-      title: "Post shared",
-      description: "Post sharing link has been copied to your clipboard"
-    });
+    const url = `${window.location.origin}/hub/post/${id}`;
+    
+    if (navigator.share && isMobile) {
+      navigator.share({
+        title: 'Check out this post on CampusSpace',
+        text: 'I found an interesting post on CampusSpace',
+        url
+      })
+      .then(() => {
+        toast({
+          title: "Post shared",
+          description: "Post shared successfully"
+        });
+      })
+      .catch((error) => {
+        console.error('Error sharing:', error);
+        copyToClipboard(url);
+      });
+    } else {
+      copyToClipboard(url);
+    }
+  };
+  
+  const copyToClipboard = (text: string) => {
+    navigator.clipboard.writeText(text).then(
+      () => {
+        toast({
+          title: "Link copied",
+          description: "Post link has been copied to your clipboard"
+        });
+      },
+      () => {
+        toast({
+          title: "Error",
+          description: "Failed to copy link to clipboard",
+          variant: "destructive"
+        });
+      }
+    );
   };
 
   const handleResourceUpload = () => {
-    // In a real app, this would handle file uploads
     toast({
       title: "Upload successful",
       description: "Your resource has been uploaded and is pending review"
@@ -248,9 +299,19 @@ const Hub = () => {
     post.author.toLowerCase().includes(searchTerm.toLowerCase())
   );
 
+  const EmptyState = () => (
+    <div className="bg-card p-6 rounded-lg border text-center space-y-3">
+      <h3 className="text-lg font-medium">Welcome to the Info Hub!</h3>
+      <p className="text-muted-foreground">
+        This is where you can share resources, ask questions, and connect with other students. 
+        Be the first to create a post!
+      </p>
+    </div>
+  );
+
   return (
     <MainLayout>
-      <div className="max-w-6xl mx-auto space-y-8">
+      <div className="max-w-6xl mx-auto space-y-8 px-4">
         {/* Header Section */}
         <div className="flex flex-col gap-4">
           <h1 className="text-3xl font-bold">Information Hub</h1>
@@ -304,205 +365,169 @@ const Hub = () => {
           </div>
         </div>
 
-        {/* Create Post Section */}
-        <section className="bg-card p-6 rounded-lg border">
-          <h2 className="text-xl font-semibold mb-4">Create a Post</h2>
-          <div className="space-y-4">
-            <Textarea 
-              placeholder="Share something with your fellow students..." 
-              value={newPostContent}
-              onChange={(e) => setNewPostContent(e.target.value)}
-              className="min-h-[100px]"
-            />
-            <div className="flex justify-end">
-              <Button onClick={handleCreatePost}>Post</Button>
-            </div>
-          </div>
-        </section>
+        <div className="grid grid-cols-1 lg:grid-cols-3 gap-8">
+          <div className="lg:col-span-2 space-y-6">
+            {/* Create Post Section */}
+            <section className="bg-card p-6 rounded-lg border">
+              <h2 className="text-xl font-semibold mb-4">Create a Post</h2>
+              <div className="space-y-4">
+                <Textarea 
+                  placeholder="Share something with your fellow students..." 
+                  value={newPostContent}
+                  onChange={(e) => setNewPostContent(e.target.value)}
+                  className="min-h-[100px]"
+                />
+                <div className="flex justify-end">
+                  <Button onClick={handleCreatePost}>Post</Button>
+                </div>
+              </div>
+            </section>
 
-        {/* Posts Feed */}
-        <section className="space-y-4">
-          <h2 className="text-xl font-semibold">Recent Posts</h2>
-          
-          {filteredPosts.length === 0 ? (
-            <div className="bg-card p-6 rounded-lg border text-center text-muted-foreground">
-              No posts found matching your search.
-            </div>
-          ) : (
-            <div className="space-y-4">
-              {filteredPosts.map((post) => (
-                <div key={post.id} className="bg-card p-6 rounded-lg border">
-                  <div className="flex justify-between items-start">
-                    <div>
-                      <h3 className="font-semibold">{post.author}</h3>
-                      <p className="text-sm text-muted-foreground">{post.timestamp}</p>
-                    </div>
-                    {post.author === "You" && (
-                      <DropdownMenu>
-                        <DropdownMenuTrigger asChild>
-                          <Button variant="ghost" size="icon">⋮</Button>
-                        </DropdownMenuTrigger>
-                        <DropdownMenuContent align="end">
-                          <DropdownMenuItem onClick={() => setEditingPost(post)}>
-                            <Edit2 className="mr-2 h-4 w-4" />
-                            Edit
-                          </DropdownMenuItem>
-                          <DropdownMenuItem onClick={() => handleDeletePost(post.id)} className="text-destructive">
-                            <Trash2 className="mr-2 h-4 w-4" />
-                            Delete
-                          </DropdownMenuItem>
-                        </DropdownMenuContent>
-                      </DropdownMenu>
-                    )}
-                  </div>
-                  
-                  <div className="my-4">
-                    <p>{post.content}</p>
-                  </div>
-                  
-                  <div className="flex items-center gap-4 border-t pt-4">
-                    <Button 
-                      variant="ghost" 
-                      size="sm"
-                      onClick={() => handleLikePost(post.id)}
-                      className={post.userLiked ? "text-primary" : ""}
-                    >
-                      <ThumbsUp className="mr-2 h-4 w-4" />
-                      {post.likes} {post.likes === 1 ? "Like" : "Likes"}
-                    </Button>
-                    <Button variant="ghost" size="sm">
-                      <MessageCircle className="mr-2 h-4 w-4" />
-                      {post.comments.length} {post.comments.length === 1 ? "Comment" : "Comments"}
-                    </Button>
-                    <Button 
-                      variant="ghost" 
-                      size="sm"
-                      onClick={() => handleSharePost(post.id)}
-                    >
-                      <Share2 className="mr-2 h-4 w-4" />
-                      Share
-                    </Button>
-                  </div>
-                  
-                  {/* Comments section */}
-                  {post.comments.length > 0 && (
-                    <div className="mt-4 pl-4 border-l space-y-3">
-                      {post.comments.map((comment) => (
-                        <div key={comment.id} className="bg-accent p-3 rounded-md">
-                          <div className="flex justify-between items-center">
-                            <h4 className="text-sm font-medium">{comment.author}</h4>
-                            <span className="text-xs text-muted-foreground">{comment.timestamp}</span>
-                          </div>
-                          <p className="text-sm mt-1">{comment.content}</p>
+            {/* Posts Feed */}
+            <section className="space-y-4">
+              <h2 className="text-xl font-semibold">Recent Posts</h2>
+              
+              {loading ? (
+                <div className="bg-card p-6 rounded-lg border text-center">
+                  <p className="text-muted-foreground">Loading posts...</p>
+                </div>
+              ) : filteredPosts.length === 0 ? (
+                <EmptyState />
+              ) : (
+                <div className="space-y-4">
+                  {filteredPosts.map((post) => (
+                    <div key={post.id} className="bg-card p-6 rounded-lg border">
+                      <div className="flex justify-between items-start">
+                        <div>
+                          <h3 className="font-semibold">{post.author}</h3>
+                          <p className="text-sm text-muted-foreground">{post.timestamp}</p>
                         </div>
-                      ))}
+                        {post.author_id === user?.id && (
+                          <DropdownMenu>
+                            <DropdownMenuTrigger asChild>
+                              <Button variant="ghost" size="icon">⋮</Button>
+                            </DropdownMenuTrigger>
+                            <DropdownMenuContent align="end">
+                              <DropdownMenuItem onClick={() => setEditingPost(post)}>
+                                <Edit2 className="mr-2 h-4 w-4" />
+                                Edit
+                              </DropdownMenuItem>
+                              <DropdownMenuItem onClick={() => handleDeletePost(post.id)} className="text-destructive">
+                                <Trash2 className="mr-2 h-4 w-4" />
+                                Delete
+                              </DropdownMenuItem>
+                            </DropdownMenuContent>
+                          </DropdownMenu>
+                        )}
+                      </div>
+                      
+                      <div className="my-4">
+                        <p>{post.content}</p>
+                      </div>
+                      
+                      <div className="flex flex-wrap items-center gap-2 border-t pt-4">
+                        <Button 
+                          variant="ghost" 
+                          size="sm"
+                          onClick={() => handleLikePost(post.id)}
+                          className={post.userLiked ? "text-primary" : ""}
+                        >
+                          <ThumbsUp className="mr-2 h-4 w-4" />
+                          {post.likes} {post.likes === 1 ? "Like" : "Likes"}
+                        </Button>
+                        <Button variant="ghost" size="sm">
+                          <MessageCircle className="mr-2 h-4 w-4" />
+                          {post.comments.length} {post.comments.length === 1 ? "Comment" : "Comments"}
+                        </Button>
+                        <Button 
+                          variant="ghost" 
+                          size="sm"
+                          onClick={() => handleSharePost(post.id)}
+                          className="ml-auto"
+                        >
+                          <Share2 className="mr-2 h-4 w-4" />
+                          Share
+                        </Button>
+                      </div>
+                      
+                      {/* Comments section */}
+                      {post.comments.length > 0 && (
+                        <div className="mt-4 pl-4 border-l space-y-3">
+                          {post.comments.map((comment) => (
+                            <div key={comment.id} className="bg-accent p-3 rounded-md">
+                              <div className="flex justify-between items-center">
+                                <h4 className="text-sm font-medium">{comment.author}</h4>
+                                <span className="text-xs text-muted-foreground">{comment.timestamp}</span>
+                              </div>
+                              <p className="text-sm mt-1">{comment.content}</p>
+                            </div>
+                          ))}
+                        </div>
+                      )}
+                      
+                      {/* Add comment */}
+                      <div className="mt-4 flex gap-2">
+                        <Input 
+                          placeholder="Write a comment..." 
+                          value={commentText[post.id] || ""}
+                          onChange={(e) => setCommentText({...commentText, [post.id]: e.target.value})}
+                        />
+                        <Button size="sm" onClick={() => handleAddComment(post.id)}>
+                          Comment
+                        </Button>
+                      </div>
                     </div>
-                  )}
-                  
-                  {/* Add comment */}
-                  <div className="mt-4 flex gap-2">
-                    <Input 
-                      placeholder="Write a comment..." 
-                      value={commentText[post.id] || ""}
-                      onChange={(e) => setCommentText({...commentText, [post.id]: e.target.value})}
-                    />
-                    <Button size="sm" onClick={() => handleAddComment(post.id)}>
-                      Comment
-                    </Button>
-                  </div>
+                  ))}
                 </div>
-              ))}
-            </div>
-          )}
-        </section>
-
-        {/* Resources Section */}
-        <section className="space-y-4">
-          <div className="flex items-center justify-between">
-            <div className="flex items-center gap-2">
-              <BookOpen className="h-5 w-5 text-primary" />
-              <h2 className="text-xl font-semibold">Academic Resources</h2>
-            </div>
-            <Button variant="ghost" className="text-primary">
-              View All <ArrowRight className="ml-2 h-4 w-4" />
-            </Button>
+              )}
+            </section>
           </div>
-          <div className="grid md:grid-cols-2 lg:grid-cols-3 gap-4">
-            {resources.map((resource) => (
-              <div 
-                key={resource.id}
-                className="p-4 rounded-lg border bg-card hover:shadow-md transition-shadow"
-              >
-                <h3 className="font-semibold">{resource.title}</h3>
-                <p className="text-sm text-muted-foreground">{resource.type}</p>
-                <div className="mt-2 flex items-center justify-between">
-                  <span className="text-sm">{resource.department}</span>
-                  <span className="text-sm text-muted-foreground">{resource.downloads} downloads</span>
+
+          <div className="space-y-6">
+            {/* Friend Requests Section */}
+            <FriendRequests />
+
+            {/* Resources Section */}
+            <section className="bg-card rounded-lg border p-6">
+              <div className="flex items-center justify-between mb-4">
+                <div className="flex items-center gap-2">
+                  <BookOpen className="h-5 w-5 text-primary" />
+                  <h2 className="text-xl font-semibold">Academic Resources</h2>
                 </div>
-                <p className="text-sm mt-1">By {resource.author}</p>
-                <Button variant="outline" size="sm" className="mt-3 w-full">
-                  Download
-                </Button>
               </div>
-            ))}
-          </div>
-        </section>
-
-        {/* Study Groups Section */}
-        <section className="space-y-4">
-          <div className="flex items-center justify-between">
-            <div className="flex items-center gap-2">
-              <Users className="h-5 w-5 text-primary" />
-              <h2 className="text-xl font-semibold">Study Groups</h2>
-            </div>
-            <Button variant="ghost" className="text-primary">
-              Create Group <ArrowRight className="ml-2 h-4 w-4" />
-            </Button>
-          </div>
-          <div className="grid md:grid-cols-2 gap-4">
-            {studyGroups.map((group) => (
-              <div 
-                key={group.title}
-                className="p-4 rounded-lg border bg-card hover:shadow-md transition-shadow"
-              >
-                <h3 className="font-semibold">{group.title}</h3>
-                <p className="text-sm text-muted-foreground">{group.members} members</p>
-                <div className="mt-2 space-y-1">
-                  <p className="text-sm">Next: {group.nextMeeting}</p>
-                  <p className="text-sm text-muted-foreground">{group.location}</p>
-                </div>
-                <Button variant="outline" size="sm" className="mt-3 w-full">
-                  Join Group
-                </Button>
+              <div className="text-center py-6">
+                <p className="text-muted-foreground">Resources coming soon!</p>
+                <p className="text-sm mt-2">Upload your study materials to share with others.</p>
               </div>
-            ))}
-          </div>
-        </section>
+            </section>
 
-        {/* Announcements Section */}
-        <section className="space-y-4">
-          <div className="flex items-center gap-2">
-            <Bell className="h-5 w-5 text-primary" />
-            <h2 className="text-xl font-semibold">Announcements</h2>
+            {/* Study Groups Section */}
+            <section className="bg-card rounded-lg border p-6">
+              <div className="flex items-center justify-between mb-4">
+                <div className="flex items-center gap-2">
+                  <Users className="h-5 w-5 text-primary" />
+                  <h2 className="text-xl font-semibold">Study Groups</h2>
+                </div>
+              </div>
+              <div className="text-center py-6">
+                <p className="text-muted-foreground">Study groups coming soon!</p>
+                <p className="text-sm mt-2">Create or join study groups to collaborate with peers.</p>
+              </div>
+            </section>
+
+            {/* Announcements Section */}
+            <section className="bg-card rounded-lg border p-6">
+              <div className="flex items-center gap-2 mb-4">
+                <Bell className="h-5 w-5 text-primary" />
+                <h2 className="text-xl font-semibold">Announcements</h2>
+              </div>
+              <div className="text-center py-6">
+                <p className="text-muted-foreground">No announcements yet</p>
+                <p className="text-sm mt-2">Important university announcements will appear here.</p>
+              </div>
+            </section>
           </div>
-          <Accordion type="single" collapsible className="w-full">
-            {announcements.map((announcement, index) => (
-              <AccordionItem key={index} value={`item-${index}`}>
-                <AccordionTrigger className="hover:no-underline">
-                  <div className="flex items-center justify-between flex-1 pr-4">
-                    <span>{announcement.title}</span>
-                    <span className="text-sm text-muted-foreground">
-                      {new Date(announcement.date).toLocaleDateString()}
-                    </span>
-                  </div>
-                </AccordionTrigger>
-                <AccordionContent>
-                  <p className="text-muted-foreground">{announcement.content}</p>
-                </AccordionContent>
-              </AccordionItem>
-            ))}
-          </Accordion>
-        </section>
+        </div>
       </div>
 
       {/* Edit Post Dialog */}
