@@ -1,11 +1,12 @@
 
 import React from 'react';
-import { Link, useNavigate } from 'react-router-dom';
+import { Link } from 'react-router-dom';
 import { Button } from '@/components/ui/button';
 import { ArrowRight, BookOpen, ShoppingBag, MessageCircle } from 'lucide-react';
+import { useAuth } from '@/contexts/AuthContext';
 
 const Index = () => {
-  const navigate = useNavigate();
+  const { user } = useAuth();
   
   const features = [
     {
@@ -28,13 +29,6 @@ const Index = () => {
     }
   ];
 
-  // Redirect to appropriate page based on authentication status
-  const handleGetStarted = () => {
-    // For now, we'll just redirect to sign in
-    // In a real app, this would check if the user is authenticated
-    navigate('/signin');
-  };
-
   return (
     <div className="min-h-screen flex flex-col items-center justify-center py-12 px-4 sm:px-6 lg:px-8">
       <div className="max-w-4xl w-full space-y-8 text-center">
@@ -48,15 +42,20 @@ const Index = () => {
         </div>
 
         <div className="flex flex-wrap justify-center gap-4">
-          <Button onClick={handleGetStarted} size="lg">
-            Get Started
-          </Button>
-          <Button asChild size="lg" variant="outline">
-            <Link to="/signin">Sign In</Link>
-          </Button>
-          <Button asChild size="lg" variant="outline">
-            <Link to="/signup">Sign Up</Link>
-          </Button>
+          {!user ? (
+            <>
+              <Button asChild size="lg">
+                <Link to="/signin">Sign In</Link>
+              </Button>
+              <Button asChild size="lg" variant="outline">
+                <Link to="/signup">Sign Up</Link>
+              </Button>
+            </>
+          ) : (
+            <Button asChild size="lg">
+              <Link to="/hub">Explore Platform</Link>
+            </Button>
+          )}
         </div>
 
         <div className="grid md:grid-cols-3 gap-8 pt-12">
