@@ -1,5 +1,5 @@
 
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import { Link, useNavigate } from 'react-router-dom';
 import { z } from 'zod';
 import { useForm } from 'react-hook-form';
@@ -14,7 +14,7 @@ import {
   FormLabel,
   FormMessage,
 } from '@/components/ui/form';
-import { useToast } from '@/hooks/use-toast';
+import { useAuth } from '@/contexts/AuthContext';
 
 const formSchema = z.object({
   email: z
@@ -34,8 +34,8 @@ const formSchema = z.object({
 
 const SignUp = () => {
   const navigate = useNavigate();
-  const { toast } = useToast();
-  const [isLoading, setIsLoading] = useState(false);
+  const { signUp, user, isLoading } = useAuth();
+  const [formError, setFormError] = useState<string | null>(null);
 
   const form = useForm<z.infer<typeof formSchema>>({
     resolver: zodResolver(formSchema),
@@ -47,30 +47,22 @@ const SignUp = () => {
     },
   });
 
+  useEffect(() => {
+    // Redirect if already logged in
+    if (user) {
+      navigate('/hub');
+    }
+  }, [user, navigate]);
+
   const onSubmit = async (values: z.infer<typeof formSchema>) => {
     try {
-      setIsLoading(true);
-      
-      // Here you would typically register the user with a backend service
-      console.log('Registering user:', values);
-      
-      // For now, we'll just simulate a successful registration
-      setTimeout(() => {
-        toast({
-          title: 'Account created!',
-          description: 'You have successfully signed up',
-        });
-        navigate('/hub');
-      }, 1000);
+      setFormError(null);
+      await signUp(values.email, values.password, values.fullName);
+      // Navigate to sign in - let them confirm their email
+      navigate('/signin');
     } catch (error) {
       console.error('Sign up error:', error);
-      toast({
-        title: 'Error',
-        description: 'Failed to create account. Please try again.',
-        variant: 'destructive',
-      });
-    } finally {
-      setIsLoading(false);
+      setFormError('Failed to create account. Please try again.');
     }
   };
 
@@ -81,6 +73,12 @@ const SignUp = () => {
           <h1 className="text-3xl font-bold">Create an Account</h1>
           <p className="text-muted-foreground">Join CampusSpace today</p>
         </div>
+        
+        {formError && (
+          <div className="bg-destructive/15 text-destructive p-3 rounded-md mb-4">
+            {formError}
+          </div>
+        )}
         
         <Form {...form}>
           <form onSubmit={form.handleSubmit(onSubmit)} className="space-y-4">

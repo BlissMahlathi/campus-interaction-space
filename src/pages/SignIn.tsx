@@ -1,5 +1,5 @@
 
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import { Link, useNavigate } from 'react-router-dom';
 import { z } from 'zod';
 import { useForm } from 'react-hook-form';
@@ -14,7 +14,7 @@ import {
   FormLabel,
   FormMessage,
 } from '@/components/ui/form';
-import { useToast } from '@/hooks/use-toast';
+import { useAuth } from '@/contexts/AuthContext';
 
 const formSchema = z.object({
   email: z.string().email('Please enter a valid email'),
@@ -23,8 +23,8 @@ const formSchema = z.object({
 
 const SignIn = () => {
   const navigate = useNavigate();
-  const { toast } = useToast();
-  const [isLoading, setIsLoading] = useState(false);
+  const { signIn, user, isLoading } = useAuth();
+  const [formError, setFormError] = useState<string | null>(null);
 
   const form = useForm<z.infer<typeof formSchema>>({
     resolver: zodResolver(formSchema),
@@ -34,30 +34,21 @@ const SignIn = () => {
     },
   });
 
+  useEffect(() => {
+    // Redirect if already logged in
+    if (user) {
+      navigate('/hub');
+    }
+  }, [user, navigate]);
+
   const onSubmit = async (values: z.infer<typeof formSchema>) => {
     try {
-      setIsLoading(true);
-      
-      // Here you would typically authenticate the user with a backend service
-      console.log('Signing in user:', values);
-      
-      // For now, we'll just simulate a successful login
-      setTimeout(() => {
-        toast({
-          title: 'Success!',
-          description: 'You have successfully signed in',
-        });
-        navigate('/hub');
-      }, 1000);
+      setFormError(null);
+      await signIn(values.email, values.password);
+      // No need to navigate here, the useEffect will handle it when the user state updates
     } catch (error) {
       console.error('Sign in error:', error);
-      toast({
-        title: 'Error',
-        description: 'Failed to sign in. Please try again.',
-        variant: 'destructive',
-      });
-    } finally {
-      setIsLoading(false);
+      setFormError('Failed to sign in. Please check your credentials and try again.');
     }
   };
 
@@ -68,6 +59,12 @@ const SignIn = () => {
           <h1 className="text-3xl font-bold">Welcome Back</h1>
           <p className="text-muted-foreground">Sign in to your CampusSpace account</p>
         </div>
+        
+        {formError && (
+          <div className="bg-destructive/15 text-destructive p-3 rounded-md mb-4">
+            {formError}
+          </div>
+        )}
         
         <Form {...form}>
           <form onSubmit={form.handleSubmit(onSubmit)} className="space-y-4">
