@@ -1,17 +1,18 @@
 
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useRef } from 'react';
 import { Input } from "@/components/ui/input";
 import { Button } from "@/components/ui/button";
 import { Card } from "@/components/ui/card";
 import { ScrollArea } from "@/components/ui/scroll-area";
 import MainLayout from '@/components/layout/MainLayout';
-import { MessageCircle, Send, User, Menu, Image, Paperclip, UserPlus } from 'lucide-react';
+import { MessageCircle, Send, User, Menu, Image, Paperclip, UserPlus, XCircle } from 'lucide-react';
 import { useIsMobile } from '@/hooks/use-mobile';
 import { Sheet, SheetContent, SheetTrigger } from "@/components/ui/sheet";
 import { useAuth } from '@/contexts/AuthContext';
 import { supabase } from '@/lib/supabase';
 import { useToast } from '@/hooks/use-toast';
 import FriendRequests, { useFriendRequests, FriendStatus } from '@/components/FriendRequests';
+import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
 
 interface Message {
   id: string;
@@ -20,11 +21,14 @@ interface Message {
   timestamp: string;
   isOutgoing: boolean;
   media_url?: string;
+  sender_avatar?: string;
+  sender_name?: string;
 }
 
 interface Conversation {
   id: string;
   name: string;
+  avatar_url?: string;
   lastMessage: string;
   timestamp: string;
   unread: boolean;
@@ -38,11 +42,14 @@ const Messages = () => {
   const [newMessage, setNewMessage] = useState("");
   const [friends, setFriends] = useState<any[]>([]);
   const [isLoading, setIsLoading] = useState(true);
+  const [isSending, setIsSending] = useState(false);
   const isMobile = useIsMobile();
   const { user } = useAuth();
   const { toast } = useToast();
   const { checkFriendshipStatus, sendFriendRequest } = useFriendRequests();
   const [mediaAttachment, setMediaAttachment] = useState<File | null>(null);
+  const messagesEndRef = useRef<HTMLDivElement>(null);
+  const scrollAreaRef = useRef<HTMLDivElement>(null);
 
   useEffect(() => {
     if (!user) return;
@@ -87,16 +94,51 @@ const Messages = () => {
         setFriends(friendsList);
         
         // Create conversations from friends
-        const conversationsList = friendsList.map(friend => ({
-          id: friend.id,
-          name: friend.name,
-          lastMessage: "Start a conversation",
-          timestamp: "Just now",
-          unread: false,
-          user_id: friend.id
-        }));
-        
-        setConversations(conversationsList);
+        if (friendsList.length > 0) {
+          // Get the last message for each friend
+          const conversationsList = await Promise.all(friendsList.map(async (friend) => {
+            try {
+              const { data: messagesData } = await supabase
+                .from('messages')
+                .select('*')
+                .or(`and(sender_id.eq.${user.id},receiver_id.eq.${friend.id}),and(sender_id.eq.${friend.id},receiver_id.eq.${user.id})`)
+                .order('created_at', { ascending: false })
+                .limit(1);
+              
+              let lastMessage = "Start a conversation";
+              let timestamp = "Just now";
+              
+              if (messagesData && messagesData.length > 0) {
+                lastMessage = messagesData[0].content;
+                timestamp = new Date(messagesData[0].created_at).toLocaleTimeString();
+              }
+              
+              return {
+                id: friend.id,
+                name: friend.name,
+                avatar_url: friend.avatar_url,
+                lastMessage,
+                timestamp,
+                unread: messagesData && messagesData.length > 0 ? !messagesData[0].read && messagesData[0].receiver_id === user.id : false,
+                user_id: friend.id
+              };
+            } catch (error) {
+              console.error('Error fetching conversation:', error);
+              // Return default conversation if error occurs
+              return {
+                id: friend.id,
+                name: friend.name,
+                avatar_url: friend.avatar_url,
+                lastMessage: "Start a conversation",
+                timestamp: "Just now",
+                unread: false,
+                user_id: friend.id
+              };
+            }
+          }));
+          
+          setConversations(conversationsList);
+        }
       } catch (error) {
         console.error('Error fetching friends:', error);
       } finally {
@@ -105,7 +147,35 @@ const Messages = () => {
     };
     
     fetchFriends();
+    
+    // Subscribe to friend_requests changes to update the list when new friends are added
+    const friendsChannel = supabase
+      .channel('public:friend_requests')
+      .on('postgres_changes', 
+        { event: '*', schema: 'public', table: 'friend_requests' },
+        (payload) => {
+          if (
+            payload.new && 
+            (payload.new.sender_id === user.id || payload.new.receiver_id === user.id) &&
+            payload.new.status === FriendStatus.ACCEPTED
+          ) {
+            fetchFriends();
+          }
+        }
+      )
+      .subscribe();
+      
+    return () => {
+      supabase.removeChannel(friendsChannel);
+    };
   }, [user]);
+
+  // Scroll to bottom when messages change
+  useEffect(() => {
+    if (messagesEndRef.current) {
+      messagesEndRef.current.scrollIntoView({ behavior: 'smooth' });
+    }
+  }, [messages]);
   
   const handleSendMessage = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -113,6 +183,7 @@ const Messages = () => {
     if (!user || !selectedConversation) return;
     
     try {
+      setIsSending(true);
       let mediaUrl = null;
       
       // If there's a media attachment, upload it first
@@ -134,30 +205,57 @@ const Messages = () => {
         mediaUrl = publicUrl;
       }
       
+      // Get sender's profile info
+      const { data: profileData } = await supabase
+        .from('profiles')
+        .select('full_name, avatar_url')
+        .eq('id', user.id)
+        .single();
+      
       // Create a new message object
       const messageData = {
         sender_id: user.id,
         receiver_id: selectedConversation,
-        content: newMessage,
+        content: newMessage || ' ', // Use space if only sending media
         media_url: mediaUrl,
         read: false
       };
       
-      const { error } = await supabase
+      const { data, error } = await supabase
         .from('messages')
-        .insert(messageData);
+        .insert(messageData)
+        .select();
         
       if (error) throw error;
       
       // Update local messages
-      setMessages(prev => [...prev, {
-        id: Date.now().toString(),
-        sender_id: user.id,
-        content: newMessage,
-        timestamp: new Date().toLocaleTimeString(),
-        isOutgoing: true,
-        media_url: mediaUrl || undefined
-      }]);
+      if (data && data[0]) {
+        const newMsg: Message = {
+          id: data[0].id,
+          sender_id: user.id,
+          content: newMessage || ' ',
+          timestamp: new Date().toLocaleTimeString(),
+          isOutgoing: true,
+          media_url: mediaUrl || undefined,
+          sender_avatar: profileData?.avatar_url,
+          sender_name: profileData?.full_name
+        };
+        
+        setMessages(prev => [...prev, newMsg]);
+      }
+      
+      // Update conversation with latest message
+      setConversations(prev => 
+        prev.map(conv => 
+          conv.id === selectedConversation 
+            ? { 
+                ...conv, 
+                lastMessage: newMessage || 'Sent an attachment', 
+                timestamp: new Date().toLocaleTimeString()
+              }
+            : conv
+        )
+      );
       
       setNewMessage("");
       setMediaAttachment(null);
@@ -168,6 +266,8 @@ const Messages = () => {
         description: 'Failed to send message',
         variant: 'destructive'
       });
+    } finally {
+      setIsSending(false);
     }
   };
 
@@ -182,9 +282,21 @@ const Messages = () => {
     
     const fetchMessages = async () => {
       try {
+        // First update unread messages as read
+        await supabase
+          .from('messages')
+          .update({ read: true })
+          .eq('sender_id', selectedConversation)
+          .eq('receiver_id', user.id)
+          .eq('read', false);
+        
+        // Then fetch all messages for the conversation
         const { data, error } = await supabase
           .from('messages')
-          .select('*')
+          .select(`
+            *,
+            sender:profiles!messages_sender_id_fkey(full_name, avatar_url)
+          `)
           .or(`and(sender_id.eq.${user.id},receiver_id.eq.${selectedConversation}),and(sender_id.eq.${selectedConversation},receiver_id.eq.${user.id})`)
           .order('created_at', { ascending: true });
           
@@ -196,8 +308,19 @@ const Messages = () => {
           content: msg.content,
           timestamp: new Date(msg.created_at).toLocaleTimeString(),
           isOutgoing: msg.sender_id === user.id,
-          media_url: msg.media_url
+          media_url: msg.media_url,
+          sender_avatar: msg.sender?.avatar_url,
+          sender_name: msg.sender?.full_name
         })));
+        
+        // Update conversation unread status
+        setConversations(prev => 
+          prev.map(conv => 
+            conv.id === selectedConversation 
+              ? { ...conv, unread: false }
+              : conv
+          )
+        );
       } catch (error) {
         console.error('Error fetching messages:', error);
       }
@@ -206,28 +329,92 @@ const Messages = () => {
     fetchMessages();
     
     // Subscribe to new messages
-    const channel = supabase
+    const messagesChannel = supabase
       .channel('messages_changes')
       .on('postgres_changes', {
         event: 'INSERT',
         schema: 'public',
         table: 'messages',
         filter: `or(and(sender_id=eq.${user.id},receiver_id=eq.${selectedConversation}),and(sender_id=eq.${selectedConversation},receiver_id=eq.${user.id}))`
-      }, (payload) => {
+      }, async (payload) => {
         const newMsg = payload.new;
+        
+        // If the new message is from the conversation partner, mark it as read
+        if (newMsg.sender_id === selectedConversation) {
+          await supabase
+            .from('messages')
+            .update({ read: true })
+            .eq('id', newMsg.id);
+        }
+        
+        // Fetch sender profile info
+        const { data: senderData } = await supabase
+          .from('profiles')
+          .select('full_name, avatar_url')
+          .eq('id', newMsg.sender_id)
+          .single();
+        
+        // Add the new message to the conversation
         setMessages(prev => [...prev, {
           id: newMsg.id,
           sender_id: newMsg.sender_id,
           content: newMsg.content,
           timestamp: new Date(newMsg.created_at).toLocaleTimeString(),
           isOutgoing: newMsg.sender_id === user.id,
-          media_url: newMsg.media_url
+          media_url: newMsg.media_url,
+          sender_avatar: senderData?.avatar_url,
+          sender_name: senderData?.full_name
         }]);
+        
+        // Update conversation with latest message
+        setConversations(prev => 
+          prev.map(conv => 
+            conv.id === selectedConversation 
+              ? { 
+                  ...conv, 
+                  lastMessage: newMsg.content || 'Sent an attachment', 
+                  timestamp: new Date(newMsg.created_at).toLocaleTimeString(),
+                  unread: false
+                }
+              : conv
+          )
+        );
+      })
+      .subscribe();
+      
+    // Subscribe to unread messages for other conversations
+    const unreadMessagesChannel = supabase
+      .channel('unread_messages')
+      .on('postgres_changes', {
+        event: 'INSERT',
+        schema: 'public',
+        table: 'messages',
+        filter: `and(receiver_id=eq.${user.id},read=eq.false)`
+      }, (payload) => {
+        const newMsg = payload.new;
+        
+        // Don't update if it's for the current conversation
+        if (newMsg.sender_id === selectedConversation) return;
+        
+        // Update the unread status for the sender's conversation
+        setConversations(prev => 
+          prev.map(conv => 
+            conv.id === newMsg.sender_id 
+              ? { 
+                  ...conv, 
+                  lastMessage: newMsg.content || 'Sent an attachment', 
+                  timestamp: new Date(newMsg.created_at).toLocaleTimeString(),
+                  unread: true
+                }
+              : conv
+          )
+        );
       })
       .subscribe();
       
     return () => {
-      supabase.removeChannel(channel);
+      supabase.removeChannel(messagesChannel);
+      supabase.removeChannel(unreadMessagesChannel);
     };
   }, [selectedConversation, user]);
 
@@ -268,9 +455,15 @@ const Messages = () => {
               }}
             >
               <div className="flex items-center gap-3">
-                <div className="w-10 h-10 rounded-full bg-primary/10 flex items-center justify-center">
-                  <User className="h-5 w-5 text-primary" />
-                </div>
+                <Avatar className="w-10 h-10">
+                  {conversation.avatar_url ? (
+                    <AvatarImage src={conversation.avatar_url} alt={conversation.name} />
+                  ) : (
+                    <AvatarFallback>
+                      <User className="h-5 w-5 text-primary" />
+                    </AvatarFallback>
+                  )}
+                </Avatar>
                 <div className="flex-1 min-w-0">
                   <div className="flex justify-between items-center">
                     <span className="font-medium">{conversation.name}</span>
@@ -311,7 +504,10 @@ const Messages = () => {
           .eq('email', email)
           .single();
           
-        if (error) throw error;
+        if (error && error.code !== 'PGRST116') {
+          // PGRST116 is the error code for no rows returned
+          throw error;
+        }
         
         if (data) {
           setFoundUser(data);
@@ -356,9 +552,15 @@ const Messages = () => {
           <div className="mt-4 p-3 bg-accent rounded-lg">
             <div className="flex items-center justify-between">
               <div className="flex items-center gap-3">
-                <div className="w-10 h-10 rounded-full bg-primary/10 flex items-center justify-center">
-                  <User className="h-5 w-5 text-primary" />
-                </div>
+                <Avatar className="h-10 w-10">
+                  {foundUser.avatar_url ? (
+                    <AvatarImage src={foundUser.avatar_url} alt={foundUser.full_name} />
+                  ) : (
+                    <AvatarFallback>
+                      <User className="h-5 w-5 text-primary" />
+                    </AvatarFallback>
+                  )}
+                </Avatar>
                 <div>
                   <p className="font-medium">{foundUser.full_name}</p>
                   <p className="text-xs text-muted-foreground">{foundUser.email}</p>
@@ -418,7 +620,10 @@ const Messages = () => {
             
             {selectedConversation ? (
               <>
-                <ScrollArea className="flex-1 p-4">
+                <ScrollArea 
+                  ref={scrollAreaRef} 
+                  className="flex-1 p-4"
+                >
                   <div className="space-y-4">
                     {messages.map((message) => (
                       <div
@@ -427,8 +632,19 @@ const Messages = () => {
                           message.isOutgoing ? "justify-end" : "justify-start"
                         }`}
                       >
+                        {!message.isOutgoing && (
+                          <Avatar className="h-8 w-8 mr-2 self-end mb-4">
+                            {message.sender_avatar ? (
+                              <AvatarImage src={message.sender_avatar} alt={message.sender_name || ""} />
+                            ) : (
+                              <AvatarFallback>
+                                <User className="h-4 w-4" />
+                              </AvatarFallback>
+                            )}
+                          </Avatar>
+                        )}
                         <div
-                          className={`max-w-[85%] rounded-lg p-3 ${
+                          className={`max-w-[75%] rounded-lg p-3 ${
                             message.isOutgoing
                               ? "bg-primary text-white"
                               : "bg-accent"
@@ -451,46 +667,60 @@ const Messages = () => {
                             {message.timestamp}
                           </span>
                         </div>
+                        {message.isOutgoing && (
+                          <Avatar className="h-8 w-8 ml-2 self-end mb-4">
+                            {message.sender_avatar ? (
+                              <AvatarImage src={message.sender_avatar} alt={message.sender_name || ""} />
+                            ) : (
+                              <AvatarFallback>
+                                <User className="h-4 w-4" />
+                              </AvatarFallback>
+                            )}
+                          </Avatar>
+                        )}
                       </div>
                     ))}
+                    <div ref={messagesEndRef} />
                   </div>
                 </ScrollArea>
 
                 <form onSubmit={handleSendMessage} className="p-4 border-t">
-                  <div className="flex gap-2">
+                  <div className="flex flex-col gap-2">
                     {mediaAttachment && (
-                      <div className="flex items-center gap-2 px-3 py-1 bg-accent rounded-full text-sm">
+                      <div className="flex items-center gap-2 px-3 py-1 bg-accent rounded-full text-sm self-start">
                         <span className="truncate max-w-[100px]">{mediaAttachment.name}</span>
                         <button 
                           type="button" 
                           onClick={() => setMediaAttachment(null)}
                           className="text-muted-foreground hover:text-primary"
                         >
-                          ×
+                          <XCircle className="h-3 w-3" />
                         </button>
                       </div>
                     )}
-                    <Input
-                      value={newMessage}
-                      onChange={(e) => setNewMessage(e.target.value)}
-                      placeholder="Type your message..."
-                      className="flex-1"
-                    />
-                    <label className="cursor-pointer">
-                      <input
-                        type="file"
-                        className="hidden"
-                        accept="image/*,.pdf,.doc,.docx"
-                        onChange={handleFileChange}
+                    <div className="flex gap-2">
+                      <Input
+                        value={newMessage}
+                        onChange={(e) => setNewMessage(e.target.value)}
+                        placeholder="Type your message..."
+                        className="flex-1"
                       />
-                      <Button type="button" variant="outline" size="icon">
-                        <Paperclip className="h-4 w-4" />
+                      <label className="cursor-pointer">
+                        <input
+                          type="file"
+                          className="hidden"
+                          accept="image/*,.pdf,.doc,.docx"
+                          onChange={handleFileChange}
+                        />
+                        <Button type="button" variant="outline" size="icon">
+                          <Paperclip className="h-4 w-4" />
+                        </Button>
+                      </label>
+                      <Button type="submit" disabled={isSending}>
+                        <Send className="h-4 w-4" />
+                        <span className="sr-only">Send message</span>
                       </Button>
-                    </label>
-                    <Button type="submit">
-                      <Send className="h-4 w-4" />
-                      <span className="sr-only">Send message</span>
-                    </Button>
+                    </div>
                   </div>
                 </form>
               </>
@@ -516,12 +746,31 @@ const Messages = () => {
               {selectedConversation ? (
                 <>
                   <div className="p-4 border-b">
-                    <h3 className="font-semibold">
-                      {conversations.find((c) => c.id === selectedConversation)?.name}
-                    </h3>
+                    <div className="flex items-center gap-2">
+                      {(() => {
+                        const conversation = conversations.find((c) => c.id === selectedConversation);
+                        return (
+                          <>
+                            <Avatar className="h-8 w-8">
+                              {conversation?.avatar_url ? (
+                                <AvatarImage src={conversation.avatar_url} alt={conversation.name} />
+                              ) : (
+                                <AvatarFallback>
+                                  <User className="h-4 w-4" />
+                                </AvatarFallback>
+                              )}
+                            </Avatar>
+                            <h3 className="font-semibold">{conversation?.name}</h3>
+                          </>
+                        );
+                      })()}
+                    </div>
                   </div>
                   
-                  <ScrollArea className="flex-1 p-4">
+                  <ScrollArea 
+                    ref={scrollAreaRef}
+                    className="flex-1 p-4"
+                  >
                     <div className="space-y-4">
                       {messages.map((message) => (
                         <div
@@ -530,6 +779,17 @@ const Messages = () => {
                             message.isOutgoing ? "justify-end" : "justify-start"
                           }`}
                         >
+                          {!message.isOutgoing && (
+                            <Avatar className="h-8 w-8 mr-2 self-end mb-4">
+                              {message.sender_avatar ? (
+                                <AvatarImage src={message.sender_avatar} alt={message.sender_name || ""} />
+                              ) : (
+                                <AvatarFallback>
+                                  <User className="h-4 w-4" />
+                                </AvatarFallback>
+                              )}
+                            </Avatar>
+                          )}
                           <div
                             className={`max-w-[70%] rounded-lg p-3 ${
                               message.isOutgoing
@@ -554,46 +814,60 @@ const Messages = () => {
                               {message.timestamp}
                             </span>
                           </div>
+                          {message.isOutgoing && (
+                            <Avatar className="h-8 w-8 ml-2 self-end mb-4">
+                              {message.sender_avatar ? (
+                                <AvatarImage src={message.sender_avatar} alt={message.sender_name || ""} />
+                              ) : (
+                                <AvatarFallback>
+                                  <User className="h-4 w-4" />
+                                </AvatarFallback>
+                              )}
+                            </Avatar>
+                          )}
                         </div>
                       ))}
+                      <div ref={messagesEndRef} />
                     </div>
                   </ScrollArea>
 
                   <form onSubmit={handleSendMessage} className="p-4 border-t">
-                    <div className="flex gap-2">
+                    <div className="flex flex-col gap-2">
                       {mediaAttachment && (
-                        <div className="flex items-center gap-2 px-3 py-1 bg-accent rounded-full text-sm">
-                          <span className="truncate max-w-[100px]">{mediaAttachment.name}</span>
+                        <div className="flex items-center gap-2 px-3 py-1 bg-accent rounded-full text-sm self-start">
+                          <span className="truncate max-w-[150px]">{mediaAttachment.name}</span>
                           <button 
                             type="button" 
                             onClick={() => setMediaAttachment(null)}
                             className="text-muted-foreground hover:text-primary"
                           >
-                            ×
+                            <XCircle className="h-3 w-3" />
                           </button>
                         </div>
                       )}
-                      <Input
-                        value={newMessage}
-                        onChange={(e) => setNewMessage(e.target.value)}
-                        placeholder="Type your message..."
-                        className="flex-1"
-                      />
-                      <label className="cursor-pointer">
-                        <input
-                          type="file"
-                          className="hidden"
-                          accept="image/*,.pdf,.doc,.docx"
-                          onChange={handleFileChange}
+                      <div className="flex gap-2">
+                        <Input
+                          value={newMessage}
+                          onChange={(e) => setNewMessage(e.target.value)}
+                          placeholder="Type your message..."
+                          className="flex-1"
                         />
-                        <Button type="button" variant="outline" size="icon">
-                          <Paperclip className="h-4 w-4" />
+                        <label className="cursor-pointer">
+                          <input
+                            type="file"
+                            className="hidden"
+                            accept="image/*,.pdf,.doc,.docx"
+                            onChange={handleFileChange}
+                          />
+                          <Button type="button" variant="outline" size="icon">
+                            <Paperclip className="h-4 w-4" />
+                          </Button>
+                        </label>
+                        <Button type="submit" disabled={isSending}>
+                          <Send className="h-4 w-4" />
+                          <span className="sr-only">Send message</span>
                         </Button>
-                      </label>
-                      <Button type="submit">
-                        <Send className="h-4 w-4" />
-                        <span className="sr-only">Send message</span>
-                      </Button>
+                      </div>
                     </div>
                   </form>
                 </>
