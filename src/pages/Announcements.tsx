@@ -5,13 +5,11 @@ import { Button } from "@/components/ui/button";
 import { Card } from "@/components/ui/card";
 import { ScrollArea } from "@/components/ui/scroll-area";
 import MainLayout from '@/components/layout/MainLayout';
-import { MessageCircle, Send, User as UserIcon, Menu, Image, Paperclip, UserPlus, XCircle } from 'lucide-react';
+import { MessageCircle, Send, XCircle } from 'lucide-react';
 import { useIsMobile } from '@/hooks/use-mobile';
-import { Sheet, SheetContent, SheetTrigger } from "@/components/ui/sheet";
 import { useAuth } from '@/contexts/AuthContext';
 import { supabase } from '@/lib/supabase';
 import { useToast } from '@/hooks/use-toast';
-import FriendRequests, { useFriendRequests, FriendStatus } from '@/components/FriendRequests';
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
 
 interface Announcement {
@@ -153,11 +151,11 @@ const Announcements = () => {
 
   return (
     <MainLayout>
-      <div className="container mx-auto max-w-4xl">
+      <div className="w-full px-4 sm:px-6 md:max-w-4xl md:mx-auto">
         <h1 className="text-2xl font-bold mb-6 text-center md:text-left">Announcements</h1>
         
         {isAdmin && (
-          <Card className="p-4 mb-8">
+          <Card className="p-4 mb-8 overflow-hidden">
             <form onSubmit={handleSubmit}>
               <div className="space-y-4">
                 <div>
@@ -199,9 +197,9 @@ const Announcements = () => {
             </div>
           ) : (
             announcements.map((announcement) => (
-              <Card key={announcement.id} className="p-4">
+              <Card key={announcement.id} className="p-4 overflow-hidden">
                 <div className="flex justify-between items-start mb-2">
-                  <div>
+                  <div className="break-words max-w-[85%]">
                     <h3 className="font-bold text-lg">{announcement.title}</h3>
                     <div className="text-sm text-muted-foreground">
                       By {announcement.user_name} • {formatDate(announcement.created_at)}
@@ -212,13 +210,13 @@ const Announcements = () => {
                       variant="ghost"
                       size="sm"
                       onClick={() => deleteAnnouncement(announcement.id)}
-                      className="text-destructive hover:text-destructive hover:bg-destructive/10"
+                      className="text-destructive hover:text-destructive hover:bg-destructive/10 flex-shrink-0"
                     >
                       <XCircle className="h-4 w-4" />
                     </Button>
                   )}
                 </div>
-                <p className="whitespace-pre-wrap">{announcement.content}</p>
+                <p className="whitespace-pre-wrap break-words">{announcement.content}</p>
               </Card>
             ))
           )}
