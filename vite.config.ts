@@ -2,6 +2,7 @@
 import { defineConfig } from "vite";
 import react from "@vitejs/plugin-react-swc";
 import path from "path";
+import { PluginOption } from 'vite';
 
 // https://vitejs.dev/config/
 export default defineConfig(({ mode }) => ({
@@ -11,8 +12,7 @@ export default defineConfig(({ mode }) => ({
   },
   plugins: [
     react(),
-    // Remove the empty string plugin that's causing the error
-  ].filter(Boolean),
+  ] as PluginOption[],
   resolve: {
     alias: {
       "@": path.resolve(__dirname, "./src"),

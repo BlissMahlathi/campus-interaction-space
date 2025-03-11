@@ -1,3 +1,4 @@
+
 import React, { useState, useEffect } from 'react';
 import { Input } from "@/components/ui/input";
 import { Button } from "@/components/ui/button";
@@ -12,9 +13,6 @@ import { supabase } from '@/lib/supabase';
 import { useToast } from '@/hooks/use-toast';
 import FriendRequests, { useFriendRequests, FriendStatus } from '@/components/FriendRequests';
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
-
-// Import User from lucide-react (if not already imported)
-import { User } from 'lucide-react';
 
 // Fix for line 122,33: Property 'id' does not exist on type '{ id: any; name: any; }[]'
 // Change from: 
