@@ -68,11 +68,7 @@ export const useFriendRequests = () => {
         setRequests(formattedData);
       } catch (error: any) {
         console.error('Error fetching friend requests:', error);
-        toast({
-          title: 'Error',
-          description: 'Failed to load friend requests',
-          variant: 'destructive'
-        });
+        // Don't show error toast to prevent disrupting user experience
       } finally {
         setLoading(false);
       }
@@ -96,7 +92,7 @@ export const useFriendRequests = () => {
     return () => {
       supabase.removeChannel(channel);
     };
-  }, [user, toast]);
+  }, [user]);
 
   const sendFriendRequest = async (receiverId: string) => {
     if (!user) return;
