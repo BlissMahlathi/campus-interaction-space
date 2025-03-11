@@ -11,8 +11,7 @@ export default defineConfig(({ mode }) => ({
   },
   plugins: [
     react(),
-    // Empty string is not a valid plugin
-    // If you need to add a condition for development mode, use proper plugin
+    // Remove the empty string plugin that's causing the error
   ].filter(Boolean),
   resolve: {
     alias: {

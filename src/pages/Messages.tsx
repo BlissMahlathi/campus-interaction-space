@@ -1,4 +1,3 @@
-
 import React, { useState, useEffect, useRef } from 'react';
 import { Input } from "@/components/ui/input";
 import { Button } from "@/components/ui/button";
@@ -33,6 +32,23 @@ interface Conversation {
   timestamp: string;
   unread: boolean;
   user_id: string;
+}
+
+interface FriendRequestData {
+  id: string;
+  sender_id: string;
+  receiver_id: string;
+  status: string;
+  sender: { 
+    id: string; 
+    full_name: string; 
+    avatar_url: string | null;
+  };
+  receiver: { 
+    id: string; 
+    full_name: string; 
+    avatar_url: string | null;
+  };
 }
 
 const Messages = () => {
@@ -70,38 +86,26 @@ const Messages = () => {
 
         if (error) throw error;
         
-        // Format friends data
         const friendsList = (data || []).map(item => {
-          // Type assertion to fix TypeScript errors
-          const friendRequest = item as {
-            sender_id: string;
-            receiver_id: string;
-            status: string;
-            sender: { id: string; full_name: string; avatar_url: string | null };
-            receiver: { id: string; full_name: string; avatar_url: string | null };
-          };
+          const friendRequest = item as any;
           
-          // If the current user is the sender, return receiver as friend
           if (friendRequest.sender_id === user.id) {
             return {
               id: friendRequest.receiver_id,
-              name: friendRequest.receiver.full_name,
-              avatar_url: friendRequest.receiver.avatar_url
+              name: friendRequest.receiver?.full_name,
+              avatar_url: friendRequest.receiver?.avatar_url
             };
           }
-          // If the current user is the receiver, return sender as friend
           return {
             id: friendRequest.sender_id,
-            name: friendRequest.sender.full_name,
-            avatar_url: friendRequest.sender.avatar_url
+            name: friendRequest.sender?.full_name,
+            avatar_url: friendRequest.sender?.avatar_url
           };
         });
         
         setFriends(friendsList);
         
-        // Create conversations from friends
         if (friendsList.length > 0) {
-          // Get the last message for each friend
           const conversationsList = await Promise.all(friendsList.map(async (friend) => {
             try {
               const { data: messagesData } = await supabase
@@ -130,7 +134,6 @@ const Messages = () => {
               };
             } catch (error) {
               console.error('Error fetching conversation:', error);
-              // Return default conversation if error occurs
               return {
                 id: friend.id,
                 name: friend.name,
@@ -154,16 +157,16 @@ const Messages = () => {
     
     fetchFriends();
     
-    // Subscribe to friend_requests changes to update the list when new friends are added
     const friendsChannel = supabase
       .channel('public:friend_requests')
       .on('postgres_changes', 
         { event: '*', schema: 'public', table: 'friend_requests' },
         (payload) => {
+          const newData = payload.new as any;
           if (
-            payload.new && 
-            (payload.new.sender_id === user.id || payload.new.receiver_id === user.id) &&
-            payload.new.status === FriendStatus.ACCEPTED
+            newData && 
+            (newData.sender_id === user.id || newData.receiver_id === user.id) &&
+            newData.status === FriendStatus.ACCEPTED
           ) {
             fetchFriends();
           }
@@ -176,7 +179,6 @@ const Messages = () => {
     };
   }, [user]);
 
-  // Scroll to bottom when messages change
   useEffect(() => {
     if (messagesEndRef.current) {
       messagesEndRef.current.scrollIntoView({ behavior: 'smooth' });
@@ -192,7 +194,6 @@ const Messages = () => {
       setIsSending(true);
       let mediaUrl = null;
       
-      // If there's a media attachment, upload it first
       if (mediaAttachment) {
         const fileExt = mediaAttachment.name.split('.').pop();
         const fileName = `${Math.random().toString(36).substring(2)}.${fileExt}`;
@@ -211,18 +212,16 @@ const Messages = () => {
         mediaUrl = publicUrl;
       }
       
-      // Get sender's profile info
       const { data: profileData } = await supabase
         .from('profiles')
         .select('full_name, avatar_url')
         .eq('id', user.id)
         .single();
       
-      // Create a new message object
       const messageData = {
         sender_id: user.id,
         receiver_id: selectedConversation,
-        content: newMessage || ' ', // Use space if only sending media
+        content: newMessage || ' ',
         media_url: mediaUrl,
         read: false
       };
@@ -234,7 +233,6 @@ const Messages = () => {
         
       if (error) throw error;
       
-      // Update local messages
       if (data && data[0]) {
         const newMsg: Message = {
           id: data[0].id,
@@ -250,7 +248,6 @@ const Messages = () => {
         setMessages(prev => [...prev, newMsg]);
       }
       
-      // Update conversation with latest message
       setConversations(prev => 
         prev.map(conv => 
           conv.id === selectedConversation 
@@ -288,7 +285,6 @@ const Messages = () => {
     
     const fetchMessages = async () => {
       try {
-        // First update unread messages as read
         await supabase
           .from('messages')
           .update({ read: true })
@@ -296,7 +292,6 @@ const Messages = () => {
           .eq('receiver_id', user.id)
           .eq('read', false);
         
-        // Then fetch all messages for the conversation
         const { data, error } = await supabase
           .from('messages')
           .select(`
@@ -319,7 +314,6 @@ const Messages = () => {
           sender_name: msg.sender?.full_name
         })));
         
-        // Update conversation unread status
         setConversations(prev => 
           prev.map(conv => 
             conv.id === selectedConversation 
@@ -334,7 +328,6 @@ const Messages = () => {
     
     fetchMessages();
     
-    // Subscribe to new messages
     const messagesChannel = supabase
       .channel('messages_changes')
       .on('postgres_changes', {
@@ -345,7 +338,6 @@ const Messages = () => {
       }, async (payload) => {
         const newMsg = payload.new;
         
-        // If the new message is from the conversation partner, mark it as read
         if (newMsg.sender_id === selectedConversation) {
           await supabase
             .from('messages')
@@ -353,14 +345,12 @@ const Messages = () => {
             .eq('id', newMsg.id);
         }
         
-        // Fetch sender profile info
         const { data: senderData } = await supabase
           .from('profiles')
           .select('full_name, avatar_url')
           .eq('id', newMsg.sender_id)
           .single();
         
-        // Add the new message to the conversation
         setMessages(prev => [...prev, {
           id: newMsg.id,
           sender_id: newMsg.sender_id,
@@ -372,7 +362,6 @@ const Messages = () => {
           sender_name: senderData?.full_name
         }]);
         
-        // Update conversation with latest message
         setConversations(prev => 
           prev.map(conv => 
             conv.id === selectedConversation 
@@ -388,7 +377,6 @@ const Messages = () => {
       })
       .subscribe();
       
-    // Subscribe to unread messages for other conversations
     const unreadMessagesChannel = supabase
       .channel('unread_messages')
       .on('postgres_changes', {
@@ -399,10 +387,8 @@ const Messages = () => {
       }, (payload) => {
         const newMsg = payload.new;
         
-        // Don't update if it's for the current conversation
         if (newMsg.sender_id === selectedConversation) return;
         
-        // Update the unread status for the sender's conversation
         setConversations(prev => 
           prev.map(conv => 
             conv.id === newMsg.sender_id 
@@ -453,7 +439,6 @@ const Messages = () => {
               }`}
               onClick={() => {
                 setSelectedConversation(conversation.id);
-                // On mobile, this should close the sidebar after selection
                 const closeButton = document.querySelector('[data-sheet-close]');
                 if (isMobile && closeButton) {
                   (closeButton as HTMLElement).click();
@@ -503,7 +488,6 @@ const Messages = () => {
       
       setIsSearching(true);
       try {
-        // Search for user by email
         const { data, error } = await supabase
           .from('profiles')
           .select('*')
@@ -511,13 +495,11 @@ const Messages = () => {
           .single();
           
         if (error && error.code !== 'PGRST116') {
-          // PGRST116 is the error code for no rows returned
           throw error;
         }
         
         if (data) {
           setFoundUser(data);
-          // Check friendship status
           const status = await checkFriendshipStatus(data.id);
           setFriendshipStatus(status);
         } else {
@@ -601,7 +583,6 @@ const Messages = () => {
   return (
     <MainLayout>
       <div className="flex h-[calc(100vh-2rem)] gap-4 -mt-6 -ml-6 -mr-6">
-        {/* Mobile view with slide-out conversations */}
         {isMobile ? (
           <div className="flex-1 flex flex-col bg-white rounded-lg">
             <div className="p-4 border-b flex justify-between items-center">
@@ -742,7 +723,6 @@ const Messages = () => {
           </div>
         ) : (
           <>
-            {/* Desktop view with side-by-side layout */}
             <div className="w-80 border-r bg-white flex flex-col">
               <ConversationsList />
               <AddFriend />
