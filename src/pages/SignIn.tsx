@@ -53,15 +53,15 @@ const SignIn = () => {
   };
 
   return (
-    <div className="min-h-screen flex items-center justify-center bg-accent">
-      <div className="w-full max-w-md p-8 bg-white rounded-lg shadow-md">
+    <div className="min-h-screen flex items-center justify-center bg-accent py-6 px-4">
+      <div className="w-full max-w-md p-6 sm:p-8 bg-white rounded-lg shadow-md">
         <div className="text-center mb-6">
-          <h1 className="text-3xl font-bold">Welcome Back</h1>
+          <h1 className="text-2xl sm:text-3xl font-bold">Welcome Back</h1>
           <p className="text-muted-foreground">Sign in to your CampusSpace account</p>
         </div>
         
         {formError && (
-          <div className="bg-destructive/15 text-destructive p-3 rounded-md mb-4">
+          <div className="bg-destructive/15 text-destructive p-3 rounded-md mb-4 text-center">
             {formError}
           </div>
         )}

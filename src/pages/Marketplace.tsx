@@ -12,9 +12,9 @@ const Marketplace = () => {
 
   return (
     <MainLayout>
-      <div className="max-w-6xl mx-auto space-y-8 px-4">
+      <div className="max-w-6xl mx-auto space-y-6 px-2 sm:px-4">
         <div className="flex flex-col gap-4">
-          <h1 className="text-2xl font-bold">Marketplace</h1>
+          <h1 className="text-2xl font-bold text-center sm:text-left">Marketplace</h1>
           
           <div className="flex flex-col sm:flex-row items-center gap-4">
             <div className="relative flex-1 w-full">
@@ -32,16 +32,16 @@ const Marketplace = () => {
             )}
           </div>
           
-          <div className="bg-card p-8 md:p-12 rounded-lg border mt-4 text-center">
+          <div className="bg-card p-6 md:p-12 rounded-lg border mt-4 text-center">
             <div className="inline-block p-6 bg-secondary rounded-full mb-4">
               <ShoppingBag className="h-10 w-10 md:h-12 md:w-12 text-primary" />
             </div>
             <h2 className="text-xl md:text-2xl font-semibold mb-2">Campus Marketplace</h2>
-            <p className="text-muted-foreground max-w-md mx-auto mb-6">
+            <p className="text-muted-foreground max-w-md mx-auto mb-6 px-2">
               Our marketplace will allow you to buy and sell textbooks, study materials, 
               and other items directly with fellow students.
             </p>
-            <Button variant="outline">Be notified when it launches</Button>
+            <Button variant="outline" className="w-full sm:w-auto">Be notified when it launches</Button>
           </div>
         </div>
       </div>

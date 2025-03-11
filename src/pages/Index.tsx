@@ -30,35 +30,35 @@ const Index = () => {
   ];
 
   return (
-    <div className="min-h-screen flex flex-col items-center justify-center py-12 px-4 sm:px-6 lg:px-8">
-      <div className="max-w-4xl w-full space-y-8 text-center">
+    <div className="min-h-screen flex flex-col items-center justify-center py-8 px-4 sm:px-6 lg:px-8">
+      <div className="w-full max-w-4xl space-y-8 text-center">
         <div className="space-y-4">
-          <h1 className="text-4xl font-bold tracking-tight text-gray-900 sm:text-5xl md:text-6xl">
+          <h1 className="text-3xl font-bold tracking-tight text-gray-900 sm:text-4xl md:text-5xl">
             Welcome to CampusSpace
           </h1>
-          <p className="text-xl text-gray-500">
+          <p className="text-lg text-gray-500 px-2 sm:px-0">
             Your all-in-one platform for campus life at University of Venda
           </p>
         </div>
 
-        <div className="flex flex-wrap justify-center gap-4">
+        <div className="flex flex-wrap justify-center gap-4 mt-6">
           {!user ? (
             <>
-              <Button asChild size="lg">
+              <Button asChild size="lg" className="w-full sm:w-auto">
                 <Link to="/signin">Sign In</Link>
               </Button>
-              <Button asChild size="lg" variant="outline">
+              <Button asChild size="lg" variant="outline" className="w-full sm:w-auto">
                 <Link to="/signup">Sign Up</Link>
               </Button>
             </>
           ) : (
-            <Button asChild size="lg">
+            <Button asChild size="lg" className="w-full sm:w-auto">
               <Link to="/hub">Explore Platform</Link>
             </Button>
           )}
         </div>
 
-        <div className="grid md:grid-cols-3 gap-8 pt-12">
+        <div className="grid grid-cols-1 md:grid-cols-3 gap-6 pt-12">
           {features.map((feature) => (
             <div key={feature.title} className="group relative bg-white p-6 rounded-xl shadow-sm hover:shadow-md transition-shadow">
               <div className="absolute -top-4 left-1/2 -translate-x-1/2">
