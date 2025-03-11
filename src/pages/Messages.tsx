@@ -72,22 +72,28 @@ const Messages = () => {
         
         // Format friends data
         const friendsList = (data || []).map(item => {
-          const senderObj = item.sender as any;
-          const receiverObj = item.receiver as any;
+          // Type assertion to fix TypeScript errors
+          const friendRequest = item as {
+            sender_id: string;
+            receiver_id: string;
+            status: string;
+            sender: { id: string; full_name: string; avatar_url: string | null };
+            receiver: { id: string; full_name: string; avatar_url: string | null };
+          };
           
           // If the current user is the sender, return receiver as friend
-          if (item.sender_id === user.id) {
+          if (friendRequest.sender_id === user.id) {
             return {
-              id: item.receiver_id,
-              name: receiverObj.full_name,
-              avatar_url: receiverObj.avatar_url
+              id: friendRequest.receiver_id,
+              name: friendRequest.receiver.full_name,
+              avatar_url: friendRequest.receiver.avatar_url
             };
           }
           // If the current user is the receiver, return sender as friend
           return {
-            id: item.sender_id,
-            name: senderObj.full_name,
-            avatar_url: senderObj.avatar_url
+            id: friendRequest.sender_id,
+            name: friendRequest.sender.full_name,
+            avatar_url: friendRequest.sender.avatar_url
           };
         });
         
